@@ -26,9 +26,29 @@ mod tests {
             assert_eq!(used, expected_used, "input: {input:?}");
         }
     }
+    
+    #[test]
+    fn decodes_integers() {
+        let cases: &[(&[u8], i64, usize)] = &[
+            (b":+64\r\n", 64, 6),
+            (b":64\r\n",64,6),
+            (b":-64\r\n",-64,6)
+        ];
 
+        for &(input, expected_num, exptec_used) in cases{
+            let (value, used) = decode(input).unwrap();
+            
+
+            let RespValue::Integer(number) = value else {
+                panic!("Integer가 반환되어야 함");
+            };
+            assert_eq!(number, expected_num);
+        }
+    }
+    
     // Todos: after finishing other decoding methods
     fn decodes_array(){      
 
     }
+
 }

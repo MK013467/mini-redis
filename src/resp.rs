@@ -7,6 +7,7 @@ pub enum ParseError {
 }
 
 pub enum RespValue {
+    Integer(i64),
     SimpleString(String),
     BulkString(Option<Vec<u8>>),
     Array(Vec<RespValue>),
@@ -24,6 +25,18 @@ pub fn decode(input: &[u8]) -> Result<(RespValue, usize), ParseError> {
     }
 
     match input[0] {
+        // Integer
+        b':' => {
+          let end = find_crlf(input).ok_or(ParseError::Incomplete)?;
+            let text = std::str::from_utf8(&input[1..end])
+                .map_err(|_| ParseError::InvalidFormat)?;
+            let result = text
+                .parse::<i64>()
+                .map_err(|_| ParseError::InvalidFormat)?;
+                
+            Ok((RespValue::Integer(result), end + 2))
+        }
+
         // Simple String
         b'+' => {
             let Some(num) = find_crlf(input) else{
