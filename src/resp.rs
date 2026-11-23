@@ -24,6 +24,7 @@ pub fn decode(input: &[u8]) -> Result<(RespValue, usize), ParseError> {
     }
 
     match input[0] {
+        // Simple String
         b'+' => {
             let Some(num) = find_crlf(input) else{
                 return Err(ParseError::InvalidFormat);
@@ -37,6 +38,7 @@ pub fn decode(input: &[u8]) -> Result<(RespValue, usize), ParseError> {
                 ));
             
         }
+        // Bulk String
         b'$' => {
             let header_end = find_crlf(input).ok_or(ParseError::Incomplete)?;
             let len_b = &input[1..header_end];
@@ -69,9 +71,34 @@ pub fn decode(input: &[u8]) -> Result<(RespValue, usize), ParseError> {
             let body = input[body_start..body_end].to_vec();
             Ok((RespValue::BulkString(Some(body)), used))
         }
+        // Array
         b'*' => {
-            // Array 파싱
-            todo!("Array 파싱")
+            let header_end  = find_crlf(input).ok_or(ParseError::Incomplete)?;
+            let count_b = &input[1..header_end];
+            if !count_b.iter().all(u8::is_ascii_digit) {
+                return Err(ParseError::InvalidLength);
+            }
+            
+            let count = std::str::from_utf8(count_b)
+                .map_err(|_| ParseError::InvalidLength)?
+                .parse::<usize>()
+                .map_err(|_| ParseError::InvalidLength)?;
+
+
+            let mut offset = header_end + 2;
+            let mut items = Vec::new();
+
+            for _ in 0..count {
+                if offset == input.len() {
+                    return Err(ParseError::Incomplete);
+                }
+
+                let (item, used) = decode(&input[offset..])?;
+                items.push(item);
+                offset += used;
+            }
+
+            Ok((RespValue::Array(items), offset))
         }
         _ =>{ 
             println!("error");

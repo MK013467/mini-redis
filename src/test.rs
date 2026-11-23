@@ -26,4 +26,9 @@ mod tests {
             assert_eq!(used, expected_used, "input: {input:?}");
         }
     }
+
+    // Todos: after finishing other decoding methods
+    fn decodes_array(){      
+
+    }
 }
