@@ -1,3 +1,8 @@
+mod resp;
+#[cfg(test)]
+mod test;
+
+use crate::resp::{RespValue, decode};
 use std::{
     io::{BufRead, BufReader, Read, Result, Write},
     net::{TcpListener, TcpStream},
@@ -23,6 +28,19 @@ fn handle_connection(stream: TcpStream) -> Result<()> {
             return Ok(());
         }
 
+        if line.starts_with(b"+") {
+            if let Ok(text) = std::str::from_utf8(&line)
+                && let Ok((RespValue::SimpleString(value), _)) = decode(text.as_bytes())
+            {
+                write!(stream.get_mut(), "+{value}\r\n")?;
+            } else {
+                stream
+                    .get_mut()
+                    .write_all(b"-ERR invalid simple string\r\n")?;
+            }
+            continue;
+        }
+
         // Temporary PING handler until the RESP decoder is ready.
         let is_ping = if line == b"*1\r\n" {
             let mut bulk = [0; b"$4\r\nPING\r\n".len()];
@@ -33,7 +51,9 @@ fn handle_connection(stream: TcpStream) -> Result<()> {
         };
 
         if !is_ping {
-            stream.get_mut().write_all(b"-ERR expected PING\r\n")?;
+            stream
+                .get_mut()
+                .write_all(b"-ERR expected PING or a simple string\r\n")?;
             return Ok(());
         }
         stream.get_mut().write_all(b"+PONG\r\n")?;

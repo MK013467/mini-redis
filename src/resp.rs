@@ -30,7 +30,7 @@ pub fn decode(input: &[u8]) -> Result<(RespValue, usize), ParseError> {
             };
             
             let clone = input.clone();
-            let s = std::str::from_utf8(&clone[..num]).unwrap();
+            let s = std::str::from_utf8(&clone[1..num]).unwrap();
                 return Ok((
                     RespValue::SimpleString(s.to_string())
                     , num - 1 
@@ -38,12 +38,40 @@ pub fn decode(input: &[u8]) -> Result<(RespValue, usize), ParseError> {
             
         }
         b'$' => {
-            // Bulk String 파싱
-            return Ok()
+            let header_end = find_crlf(input).ok_or(ParseError::Incomplete)?;
+            let len_b = &input[1..header_end];
+            let body_start = header_end + 2;
+
+            if len_b == b"-1" {
+                return Ok((RespValue::BulkString(None), body_start));
+            }
+
+            if !len_b.iter().all(u8::is_ascii_digit) {
+                return Err(ParseError::InvalidLength);
+            }
+
+            let len = std::str::from_utf8(len_b)
+                .map_err(|_| ParseError::InvalidLength)?
+                .parse::<usize>()
+                .map_err(|_| ParseError::InvalidLength)?;
+
+            let body_end = body_start
+                .checked_add(len)
+                .ok_or(ParseError::InvalidLength)?;
+
+            let used = body_end.checked_add(2).ok_or(ParseError::InvalidLength)?;
+
+            let terminator = input.get(body_end..used).ok_or(ParseError::Incomplete)?;
+            if terminator != b"\r\n" {
+                return Err(ParseError::InvalidFormat);
+            }
+
+            let body = input[body_start..body_end].to_vec();
+            Ok((RespValue::BulkString(Some(body)), used))
         }
         b'*' => {
             // Array 파싱
-            return Ok(None)
+            todo!("Array 파싱")
         }
         _ =>{ 
             println!("error");
