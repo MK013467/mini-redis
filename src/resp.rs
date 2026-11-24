@@ -21,7 +21,7 @@ fn find_crlf( input: &[u8]) -> Option<usize>{
 
 pub fn decode(input: &[u8]) -> Result<(RespValue, usize), ParseError> {
     if input.is_empty() {
-        return Err(ParseError::InvalidFormat);
+        return Err(ParseError::Incomplete);
     }
 
     match input[0] {
@@ -39,17 +39,10 @@ pub fn decode(input: &[u8]) -> Result<(RespValue, usize), ParseError> {
 
         // Simple String
         b'+' => {
-            let Some(num) = find_crlf(input) else{
-                return Err(ParseError::InvalidFormat);
-            };
-            
-            let clone = input.clone();
-            let s = std::str::from_utf8(&clone[1..num]).unwrap();
-                return Ok((
-                    RespValue::SimpleString(s.to_string())
-                    , num - 1 
-                ));
-            
+            let end = find_crlf(input).ok_or(ParseError::Incomplete)?;
+            let text = std::str::from_utf8(&input[1..end])
+                .map_err(|_| ParseError::InvalidFormat)?;
+            Ok((RespValue::SimpleString(text.to_owned()), end + 2))
         }
         // Bulk String
         b'$' => {
