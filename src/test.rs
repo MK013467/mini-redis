@@ -78,7 +78,7 @@ mod tests {
         assert_eq!(used, input.len());
     }
 
-   #[test]
+    #[test]
     fn responds_to_ping_and_echo() {
         let cases: &[(&[u8], &[u8])] = &[
             (b"*1\r\n$4\r\nPING\r\n", b"+PONG\r\n"),

@@ -13,11 +13,9 @@ pub enum RespValue {
     Array(Vec<RespValue>),
 }
 
-
-fn find_crlf( input: &[u8]) -> Option<usize>{
-    input.windows(2).position(|item|  item == b"\r\n") 
+fn find_crlf(input: &[u8]) -> Option<usize> {
+    input.windows(2).position(|item| item == b"\r\n")
 }
-
 
 pub fn decode(input: &[u8]) -> Result<(RespValue, usize), ParseError> {
     if input.is_empty() {
@@ -27,21 +25,19 @@ pub fn decode(input: &[u8]) -> Result<(RespValue, usize), ParseError> {
     match input[0] {
         // Integer
         b':' => {
-          let end = find_crlf(input).ok_or(ParseError::Incomplete)?;
-            let text = std::str::from_utf8(&input[1..end])
-                .map_err(|_| ParseError::InvalidFormat)?;
-            let result = text
-                .parse::<i64>()
-                .map_err(|_| ParseError::InvalidFormat)?;
-                
+            let end = find_crlf(input).ok_or(ParseError::Incomplete)?;
+            let text =
+                std::str::from_utf8(&input[1..end]).map_err(|_| ParseError::InvalidFormat)?;
+            let result = text.parse::<i64>().map_err(|_| ParseError::InvalidFormat)?;
+
             Ok((RespValue::Integer(result), end + 2))
         }
 
         // Simple String
         b'+' => {
             let end = find_crlf(input).ok_or(ParseError::Incomplete)?;
-            let text = std::str::from_utf8(&input[1..end])
-                .map_err(|_| ParseError::InvalidFormat)?;
+            let text =
+                std::str::from_utf8(&input[1..end]).map_err(|_| ParseError::InvalidFormat)?;
             Ok((RespValue::SimpleString(text.to_owned()), end + 2))
         }
         // Bulk String
@@ -79,17 +75,16 @@ pub fn decode(input: &[u8]) -> Result<(RespValue, usize), ParseError> {
         }
         // Array
         b'*' => {
-            let header_end  = find_crlf(input).ok_or(ParseError::Incomplete)?;
+            let header_end = find_crlf(input).ok_or(ParseError::Incomplete)?;
             let count_b = &input[1..header_end];
             if !count_b.iter().all(u8::is_ascii_digit) {
                 return Err(ParseError::InvalidLength);
             }
-            
+
             let count = std::str::from_utf8(count_b)
                 .map_err(|_| ParseError::InvalidLength)?
                 .parse::<usize>()
                 .map_err(|_| ParseError::InvalidLength)?;
-
 
             let mut offset = header_end + 2;
             let mut items = Vec::new();
@@ -106,8 +101,9 @@ pub fn decode(input: &[u8]) -> Result<(RespValue, usize), ParseError> {
 
             Ok((RespValue::Array(items), offset))
         }
-        _ =>{ 
+        _ => {
             println!("error");
             Err(ParseError::InvalidPrefix)
-        }}
+        }
+    }
 }
