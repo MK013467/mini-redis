@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::resp::{ParseError, RespValue, decode};
+    use crate::resp::{RespValue, decode};
+    use crate::storage::Storage;
 
     #[test]
     /*
@@ -80,6 +81,7 @@ mod tests {
 
     #[test]
     fn responds_to_ping_and_echo() {
+        let mut storage = Storage::default();
         let cases: &[(&[u8], &[u8])] = &[
             (b"*1\r\n$4\r\nPING\r\n", b"+PONG\r\n"),
             (b"*2\r\n$4\r\nECHO\r\n$5\r\nhello\r\n", b"$5\r\nhello\r\n"),
@@ -90,7 +92,35 @@ mod tests {
 
             assert_eq!(used, request.len(), "request: {request:?}");
             assert_eq!(
-                crate::handle_command(&value).as_slice(),
+                crate::handle_command(&value, &mut storage).as_slice(),
+                expected_response,
+                "request: {request:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn stores_reads_and_deletes_values() {
+        let mut storage = Storage::default();
+        let cases: &[(&[u8], &[u8])] = &[
+            (b"*2\r\n$3\r\nGET\r\n$3\r\nfoo\r\n", b"$-1\r\n"),
+            (b"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n", b"+OK\r\n"),
+            (b"*2\r\n$3\r\nGET\r\n$3\r\nfoo\r\n", b"$3\r\nbar\r\n"),
+            (
+                b"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$1\r\n\xff\r\n",
+                b"+OK\r\n",
+            ),
+            (b"*2\r\n$3\r\nGET\r\n$3\r\nfoo\r\n", b"$1\r\n\xff\r\n"),
+            (b"*2\r\n$3\r\nDEL\r\n$3\r\nfoo\r\n", b":1\r\n"),
+            (b"*2\r\n$3\r\nDEL\r\n$3\r\nfoo\r\n", b":0\r\n"),
+            (b"*2\r\n$3\r\nGET\r\n$3\r\nfoo\r\n", b"$-1\r\n"),
+        ];
+
+        for &(request, expected_response) in cases {
+            let (value, used) = decode(request).unwrap();
+            assert_eq!(used, request.len(), "request: {request:?}");
+            assert_eq!(
+                crate::handle_command(&value, &mut storage).as_slice(),
                 expected_response,
                 "request: {request:?}"
             );
